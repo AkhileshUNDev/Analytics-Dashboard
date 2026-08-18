@@ -669,37 +669,10 @@ function extractVisitors(data) {
 
 function currentRegistry() { return (rawData && rawData.ApartmentRegistry) || {}; }
 
-// If the real ApartmentRegistry never loaded (data gap on the Supabase side),
-// derive a partial one from every visitor's ApartmentAnalytics/FavoritedUnits
-// so the registry section and unit lookups are never just blank. Building
-// and Status can't be recovered this way, so they're marked "Unknown".
-function buildDerivedRegistry() {
-  const reg = {};
-  const ensure = (unitId) => {
-    if (!reg[unitId]) reg[unitId] = { Building: 'Unknown', Status: 'Unknown', TotalViews: 0, TotalFavorites: 0, TotalPdfOpens: 0, TotalBalconyViews: 0, TotalFloorCutViews: 0 };
-    return reg[unitId];
-  };
-  allVisitors.forEach(v => {
-    Object.entries(v.apartmentAnalytics || {}).forEach(([unitId, d]) => {
-      const r = ensure(unitId);
-      r.TotalViews += d.ViewCount || 0;
-      r.TotalPdfOpens += d.PdfOpened ? 1 : 0;
-      r.TotalBalconyViews += d.BalconyViewCount || 0;
-      r.TotalFloorCutViews += d.FloorCutViewCount || 0;
-    });
-    (v.favoritedUnits || []).forEach(unitId => { ensure(unitId).TotalFavorites += 1; });
-  });
-  return reg;
-}
-
-// Returns { registry, derived } — the real registry when it has data,
-// otherwise a best-effort derived one with `derived: true` so callers can
-// show an honest "estimated from visitor activity" note instead of blanking.
+// Always the real registry — no synthesized "Unknown" fallback data. If it's
+// empty, the UI should show a clean empty state, not fabricated cards.
 function effectiveRegistry() {
-  const real = currentRegistry();
-  if (Object.keys(real).length) return { registry: real, derived: false };
-  const derived = buildDerivedRegistry();
-  return { registry: derived, derived: Object.keys(derived).length > 0 };
+  return { registry: currentRegistry(), derived: false };
 }
 
 function computeSalesPersonStats(visitors) {
@@ -1172,9 +1145,7 @@ function populateApartmentSortDropdown() {
 }
 
 function renderApartmentRegistry() {
-  const { registry, derived } = effectiveRegistry();
-  const noteEl = document.getElementById('registry-note');
-  if (noteEl) noteEl.style.display = derived ? 'block' : 'none';
+  const { registry } = effectiveRegistry();
 
   populateApartmentSortDropdown();
   const st = sortState.apartments;

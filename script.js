@@ -555,11 +555,6 @@ async function fetchAnalyticsFromSupabase() {
       "apikey": SUPABASE_ANON_KEY,
       "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
       "Content-Type": "application/json",
-      // Explicitly request a large window and an exact total count, so a
-      // growing visitor base (100+/week) never gets silently truncated by
-      // PostgREST's default row cap — if the real total exceeds what we
-      // fetched, that's now detectable (and reported) instead of just
-      // quietly losing the oldest/newest visitors off the end of the list.
       "Range-Unit": "items",
       "Range": "0-19999",
       "Prefer": "count=exact"
@@ -571,7 +566,14 @@ async function fetchAnalyticsFromSupabase() {
     ]);
 
     if (!userRes.ok) throw new Error(`user_sessions: ${userRes.status} ${userRes.statusText}`);
+    
     const userRows = await userRes.json();
+
+    // Check if RLS blocked the response (returns [] even if rows exist in database)
+    if (userRows.length === 0) {
+      console.warn("No rows returned. Ensure Row Level Security (RLS) SELECT policies exist for 'anon'.");
+    }
+
     warnIfTruncated('user_sessions (visitors)', userRes, userRows.length);
 
     let globalRows = [];

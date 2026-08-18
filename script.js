@@ -107,15 +107,26 @@ function renderKVGrid(obj, labelMap, wideKeys) {
 function renderFilterUsage(fu) {
   if (!fu || !Object.keys(fu).length) return emptyState('No filter usage recorded.');
   const known = ['PriceRange', 'SurfaceRange', 'FloorRange', 'SelectedRooms', 'SelectedBuildings', 'SelectedStatus', 'FilteredApartmentCount'];
-  let items = '';
-  if (fu.PriceRange && typeof fu.PriceRange === 'object') items += kvItem('Price', fmtMoney(fu.PriceRange.Min) + ' → ' + fmtMoney(fu.PriceRange.Max), true);
-  if (fu.SurfaceRange && typeof fu.SurfaceRange === 'object') items += kvItem('Surface (m²)', fmtNum(fu.SurfaceRange.Min) + ' → ' + fmtNum(fu.SurfaceRange.Max));
-  if (fu.FloorRange && typeof fu.FloorRange === 'object') items += kvItem('Floor', fmtNum(fu.FloorRange.Min) + ' → ' + fmtNum(fu.FloorRange.Max));
-  if (fu.SelectedRooms) items += `<div class="kv-item"><div class="kv-label">Rooms</div>${formatDynVal(fu.SelectedRooms)}</div>`;
-  if (fu.SelectedBuildings) items += `<div class="kv-item"><div class="kv-label">Buildings</div>${formatDynVal(fu.SelectedBuildings)}</div>`;
-  if (fu.SelectedStatus) items += `<div class="kv-item"><div class="kv-label">Status</div>${formatDynVal(fu.SelectedStatus)}</div>`;
-  if (fu.FilteredApartmentCount != null) items += kvItem('Filtered Apartments', fu.FilteredApartmentCount);
-  let html = items ? `<div class="kv-grid">${items}</div>` : '';
+
+  // Simple single-value metrics stay in compact boxes — they're all short,
+  // so the boxes stay short and uniform with nothing to leave empty.
+  let statItems = '';
+  if (fu.PriceRange && typeof fu.PriceRange === 'object') statItems += kvItem('Price', fmtMoney(fu.PriceRange.Min) + ' → ' + fmtMoney(fu.PriceRange.Max), true);
+  if (fu.SurfaceRange && typeof fu.SurfaceRange === 'object') statItems += kvItem('Surface (m²)', fmtNum(fu.SurfaceRange.Min) + ' → ' + fmtNum(fu.SurfaceRange.Max));
+  if (fu.FloorRange && typeof fu.FloorRange === 'object') statItems += kvItem('Floor', fmtNum(fu.FloorRange.Min) + ' → ' + fmtNum(fu.FloorRange.Max));
+  if (fu.FilteredApartmentCount != null) statItems += kvItem('Filtered Apartments', fu.FilteredApartmentCount);
+
+  // Multi-select filters (variable number of chips) get flowing label+chip
+  // rows instead of a boxed card — there's no box height to mismatch, since
+  // there's no box at all.
+  let tagRows = '';
+  if (fu.SelectedRooms) tagRows += `<div class="filter-tag-row"><span class="filter-tag-label">Rooms</span>${formatDynVal(fu.SelectedRooms)}</div>`;
+  if (fu.SelectedBuildings) tagRows += `<div class="filter-tag-row"><span class="filter-tag-label">Buildings</span>${formatDynVal(fu.SelectedBuildings)}</div>`;
+  if (fu.SelectedStatus) tagRows += `<div class="filter-tag-row"><span class="filter-tag-label">Status</span>${formatDynVal(fu.SelectedStatus)}</div>`;
+
+  let html = statItems ? `<div class="kv-grid">${statItems}</div>` : '';
+  if (tagRows) html += `<div class="filter-tag-rows">${tagRows}</div>`;
+
   const extraKeys = Object.keys(fu).filter(k => !known.includes(k));
   if (extraKeys.length) {
     const extraObj = {}; extraKeys.forEach(k => extraObj[k] = fu[k]);
@@ -132,7 +143,7 @@ function renderFavoritedUnits(favUnits, apartmentAnalytics, registry) {
     return `<div class="mini-card">
       <div class="mini-card-title">
         <span>${escapeHtml(unitId)}</span>
-        <span class="mini-card-badges"><span class="badge badge-yellow">Favorite</span></span>
+        <span class="mini-card-badges"><span class="badge badge-pink">❤️ Favorite</span></span>
       </div>
       <div class="mini-card-sub">${reg ? escapeHtml(reg.Building || '-') + ' · ' + escapeHtml(reg.Status || '-') : 'Not found in registry'}</div>
       <div class="mini-card-stats">
@@ -154,7 +165,7 @@ function renderApartmentAnalyticsCards(aa, registry, favoritedUnits) {
       <div class="mini-card-title">
         <span>${escapeHtml(unitId)}</span>
         <span class="mini-card-badges">
-          ${isFav ? '<span class="badge badge-yellow">Favorite</span>' : ''}
+          ${isFav ? '<span class="badge badge-pink">❤️ Favorite</span>' : ''}
           ${data.PdfOpened ? '<span class="badge badge-yes">PDF</span>' : ''}
         </span>
       </div>
@@ -176,13 +187,12 @@ function withIcon(map, val) { return val && map[val] ? `${map[val]} ${val}` : va
 function renderEnvironmentDetail(env) {
   env = env || {};
   let html = sectionTitle('Environment');
-  html += '<div class="env-section-title">Last Known State</div>';
-  html += renderKVGrid({
+  html += '<div class="env-section"><div class="env-section-title">Last Known State</div>' + (renderKVGrid({
     LastClockTime: env.LastClockTime,
     LastDate: env.LastDate,
     LastTimeOfDay: withIcon(TIME_OF_DAY_ICONS, env.LastTimeOfDay),
     LastWeather: withIcon(WEATHER_ICONS, env.LastWeather)
-  }, { LastClockTime: 'Clock', LastDate: 'Date', LastTimeOfDay: 'Time of Day', LastWeather: 'Weather' }, ['LastDate']) || emptyState('No last-state data recorded.');
+  }, { LastClockTime: 'Clock', LastDate: 'Date', LastTimeOfDay: 'Time of Day', LastWeather: 'Weather' }, ['LastDate']) || emptyState('No last-state data recorded.')) + '</div>';
   html += chipCountsSection('Time of Day Selections', env.TimeOfDaySelectionCounts, TIME_OF_DAY_ICONS);
   html += chipCountsSection('Weather Selections', env.WeatherSelectionCounts, WEATHER_ICONS);
   const known = ['LastClockTime', 'LastDate', 'LastTimeOfDay', 'LastWeather', 'TimeOfDaySelectionCounts', 'WeatherSelectionCounts'];
@@ -201,20 +211,34 @@ function chipCountsSection(title, obj, iconMap) {
   return `<div class="env-section"><div class="env-section-title">${escapeHtml(title)}</div>${body}</div>`;
 }
 
+// Same split used for the main Filter Usage panel: simple range/count
+// values stay in compact boxes, multi-select chip lists (Rooms/Buildings)
+// become flowing label+chip rows instead of boxes — so there's nothing to
+// leave empty when the chip count varies.
+function renderJourneyFilterState(fs) {
+  if (!fs) return '';
+  const statFields = { PriceRange: 'Price Range', SurfaceRange: 'Surface Range', FloorRange: 'Floor Range', FilteredCount: 'Filtered Count' };
+  const tagFields = { SelectedRooms: 'Rooms', SelectedBuildings: 'Buildings' };
+
+  let statItems = '';
+  Object.keys(statFields).forEach(k => { if (fs[k] !== undefined) statItems += kvItem(statFields[k], fs[k], k === 'PriceRange'); });
+
+  let tagRows = '';
+  Object.keys(tagFields).forEach(k => { if (fs[k] !== undefined) tagRows += `<div class="filter-tag-row"><span class="filter-tag-label">${escapeHtml(tagFields[k])}</span>${formatDynVal(fs[k])}</div>`; });
+
+  let html = statItems ? `<div class="kv-grid">${statItems}</div>` : '';
+  if (tagRows) html += `<div class="filter-tag-rows">${tagRows}</div>`;
+
+  const known = Object.keys(statFields).concat(Object.keys(tagFields));
+  const extraKeys = Object.keys(fs).filter(k => !known.includes(k));
+  if (extraKeys.length) { const eo = {}; extraKeys.forEach(k => eo[k] = fs[k]); html += renderKVGrid(eo); }
+  return html;
+}
+
 function renderJourneyStepsHTML(journey) {
   if (!journey || !journey.length) return emptyState('No journey recorded.');
-  const filterFieldOrder = ['PriceRange', 'SurfaceRange', 'FloorRange', 'FilteredCount', 'SelectedRooms', 'SelectedBuildings'];
   return '<div class="journey-timeline">' + journey.map((j, i) => {
-    let filterHtml = '';
-    if (j.FilterState) {
-      const fs = j.FilterState, ordered = {};
-      filterFieldOrder.forEach(k => { if (fs[k] !== undefined) ordered[k] = fs[k]; });
-      Object.keys(fs).forEach(k => { if (!(k in ordered)) ordered[k] = fs[k]; });
-      filterHtml = `<div class="js-filterstate">${renderKVGrid(ordered, {
-        PriceRange: 'Price Range', SurfaceRange: 'Surface Range', FloorRange: 'Floor Range',
-        SelectedRooms: 'Rooms', SelectedBuildings: 'Buildings', FilteredCount: 'Filtered Count'
-      }, ['PriceRange', 'SelectedBuildings'])}</div>`;
-    }
+    const filterHtml = j.FilterState ? `<div class="js-filterstate">${renderJourneyFilterState(j.FilterState)}</div>` : '';
     const sub = j.SubActions && j.SubActions.length
       ? `<div class="chip-list journey-tchips">${j.SubActions.map(s => `<span class="chip">${escapeHtml(s)}</span>`).join('')}</div>` : '';
     return `<div class="journey-titem">
@@ -270,11 +294,12 @@ const META_KEYS = ['ClickCount', 'OpenCount', 'TotalTime', 'AverageTime', 'LastO
 // ── Global state ─────────────────────────────────────────────
 let rawData = null;
 let allVisitors = [];         // every visitor, flattened & derived
-let spFilteredVisitors = [];  // filtered by salesPerson only (drives visitor dropdown)
-let scopedVisitors = [];      // filtered by salesPerson + visitor (drives aggregate/detail rendering)
+let monthFilteredVisitors = []; // filtered by month only (drives sales-person dropdown & stats)
+let spFilteredVisitors = [];  // filtered by month + salesPerson (drives visitor dropdown)
+let scopedVisitors = [];      // filtered by month + salesPerson + visitor (drives aggregate/detail rendering)
 let currentLeaves = [];       // flattened hierarchy leaves (used by Top Interests + PDF)
 
-const filterState = { scope: 'global', salesPerson: 'ALL', visitor: 'ALL' };
+const filterState = { scope: 'global', month: 'ALL', salesPerson: 'ALL', visitor: 'ALL' };
 const sortState = {
   features: { key: null, dir: 'asc' },
   apartments: { key: null, dir: 'asc' },
@@ -529,7 +554,15 @@ async function fetchAnalyticsFromSupabase() {
     const headers = {
       "apikey": SUPABASE_ANON_KEY,
       "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      // Explicitly request a large window and an exact total count, so a
+      // growing visitor base (100+/week) never gets silently truncated by
+      // PostgREST's default row cap — if the real total exceeds what we
+      // fetched, that's now detectable (and reported) instead of just
+      // quietly losing the oldest/newest visitors off the end of the list.
+      "Range-Unit": "items",
+      "Range": "0-19999",
+      "Prefer": "count=exact"
     };
 
     const [userRes, globalRes] = await Promise.all([
@@ -539,6 +572,7 @@ async function fetchAnalyticsFromSupabase() {
 
     if (!userRes.ok) throw new Error(`user_sessions: ${userRes.status} ${userRes.statusText}`);
     const userRows = await userRes.json();
+    warnIfTruncated('user_sessions (visitors)', userRes, userRows.length);
 
     let globalRows = [];
     if (globalRes.ok) {
@@ -550,6 +584,22 @@ async function fetchAnalyticsFromSupabase() {
   } catch (err) {
     console.error("Supabase load error:", err);
     showLoadError(err.message || String(err));
+  }
+}
+
+// PostgREST returns a Content-Range header like "0-999/1532" — the part
+// after the slash is the TRUE total row count on the server, which can be
+// larger than what actually came back if a server-side row cap (db-max-rows)
+// kicked in. Surfaces a visible warning rather than failing silently.
+function warnIfTruncated(label, res, fetchedCount) {
+  const contentRange = res.headers && res.headers.get ? res.headers.get('content-range') : null;
+  if (!contentRange) return;
+  const m = contentRange.match(/\/(\d+)$/);
+  if (!m) return;
+  const total = parseInt(m[1], 10);
+  if (total > fetchedCount) {
+    console.warn(`Supabase ${label}: fetched ${fetchedCount} of ${total} total rows — some visitors are not shown. Raise the Range header above, or increase your Supabase project's db-max-rows setting.`);
+    toast(`Showing ${fetchedCount} of ${total} visitors — data limit reached`, 'info', 7000);
   }
 }
 
@@ -959,6 +1009,18 @@ function renderJourneySummaryChips(journey) {
   return `<div class="chip-list journey-summary-chips">${journey.map((j, i) => `<span class="chip">${i + 1}. ${escapeHtml(j.Action || '—')}</span>`).join('')}</div>`;
 }
 
+// Compact by default (numbered summary chips), full timeline available via
+// a collapsible toggle — used identically for the multi-visitor list and
+// the single-visitor detail view, so both look and behave the same way.
+function renderJourneyCollapsible(journey) {
+  if (!journey || !journey.length) return emptyState('No journey recorded.');
+  return `${renderJourneySummaryChips(journey)}
+    <details class="journey-details">
+      <summary>View step-by-step details</summary>
+      ${renderJourneyStepsHTML(journey)}
+    </details>`;
+}
+
 function renderUserJourneys(visitors) {
   const el = document.getElementById('user-journeys');
   const pagerEl = document.getElementById('journeys-pager');
@@ -967,11 +1029,7 @@ function renderUserJourneys(visitors) {
     const dur = (start && end) ? formatDuration(end - start) : null;
     return `<div class="journey-user-row">
       <div class="journey-user-name">${escapeHtml(v.id)} <span class="jun-sp">via ${escapeHtml(v.salesPerson)}</span> ${dur ? `<span class="jun-dur">· ${dur}</span>` : ''}</div>
-      ${renderJourneySummaryChips(v.journey)}
-      <details class="journey-details">
-        <summary>View step-by-step details</summary>
-        ${renderJourneyStepsHTML(v.journey)}
-      </details>
+      ${renderJourneyCollapsible(v.journey)}
     </div>`;
   }, emptyState('No journeys recorded.'));
 }
@@ -1037,7 +1095,7 @@ function buildVisitorDetailHTML(v, prefix) {
     <div class="bar-group" id="${prefix}-feature-bars"></div>
 
     ${sectionTitle('User Journey')}
-    ${renderJourneyStepsHTML(v.journey)}
+    ${renderJourneyCollapsible(v.journey)}
 
     ${renderEnvironmentDetail(v.environment)}
 
@@ -1130,11 +1188,12 @@ function renderApartmentRegistry() {
     : sortRows(rows, st.key, st.dir, (r, key) => key === 'Building' ? (r[key] || '') : (r[key] || 0));
 
   const grid = document.getElementById('apartment-registry-grid');
+  const pagerEl = document.getElementById('apartment-registry-pager');
   if (!grid) return;
-  if (!Object.keys(registry).length) { grid.innerHTML = emptyState('No apartment registry data.'); return; }
-  if (!rows.length) { grid.innerHTML = emptyState('No apartments found.'); return; }
+  if (!Object.keys(registry).length) { grid.innerHTML = emptyState('No apartment registry data.'); if (pagerEl) pagerEl.innerHTML = ''; return; }
+  if (!rows.length) { grid.innerHTML = emptyState('No apartments found.'); if (pagerEl) pagerEl.innerHTML = ''; return; }
 
-  grid.innerHTML = rows.map(u => `
+  createPager(rows, 12, grid, pagerEl, u => `
     <div class="mini-card">
       <div class="mini-card-title">
         <span>${escapeHtml(u.id)}</span>
@@ -1149,7 +1208,7 @@ function renderApartmentRegistry() {
         <span>Floor Cut ${u.TotalFloorCutViews || 0}</span>
       </div>
     </div>
-  `).join('');
+  `, emptyState('No apartments found.'));
 }
 
 function renderUsersTable(visitors) {
@@ -1286,9 +1345,11 @@ function showViewPanel(id) {
 
 function updateScopeUI() {
   document.querySelectorAll('.scope-btn').forEach(b => b.classList.toggle('active', b.dataset.scope === filterState.scope));
+  const monthWrap = document.getElementById('month-filter-wrap');
   const spWrap = document.getElementById('salesperson-filter-wrap');
   const visWrap = document.getElementById('visitor-filter-wrap');
   const show = filterState.scope === 'user';
+  if (monthWrap) monthWrap.style.display = show ? 'flex' : 'none';
   if (spWrap) spWrap.style.display = show ? 'flex' : 'none';
   if (visWrap) visWrap.style.display = show ? 'flex' : 'none';
 }
@@ -1297,8 +1358,9 @@ function renderSessionLabel() {
   const el = document.getElementById('session-label');
   if (!el) return;
   if (filterState.scope === 'global') { el.textContent = `${rawData.TotalUsers ?? allVisitors.length} Total Users · Global scope`; return; }
-  if (filterState.visitor !== 'ALL') { const v = scopedVisitors[0]; el.textContent = v ? `Visitor: ${v.id} · ${v.salesPerson}` : 'Visitor not found'; return; }
-  el.textContent = filterState.salesPerson === 'ALL' ? `${scopedVisitors.length} Visitors · All Sales Persons` : `${scopedVisitors.length} Visitors · ${filterState.salesPerson}`;
+  const monthPart = filterState.month === 'ALL' ? '' : ` · ${formatMonthLabel(filterState.month)}`;
+  if (filterState.visitor !== 'ALL') { const v = scopedVisitors[0]; el.textContent = v ? `Visitor: ${v.id} · ${v.salesPerson}${monthPart}` : 'Visitor not found'; return; }
+  el.textContent = (filterState.salesPerson === 'ALL' ? `${scopedVisitors.length} Visitors · All Sales Persons` : `${scopedVisitors.length} Visitors · ${filterState.salesPerson}`) + monthPart;
 }
 
 function renderGlobalView() {
@@ -1330,7 +1392,7 @@ function renderGlobalView() {
 function renderUserAggregateView() {
   const visitors = scopedVisitors;
 
-  const spStats = computeSalesPersonStats(allVisitors);
+  const spStats = computeSalesPersonStats(monthFilteredVisitors);
   const spGrid = document.getElementById('sp-card-grid');
   spGrid.innerHTML = spStats.length ? spStats.map(s => `
     <div class="sp-card ${s.name === filterState.salesPerson ? 'active-sp' : ''}" data-sp="${escapeHtml(s.name)}">
@@ -1387,31 +1449,108 @@ function renderUserAggregateView() {
   renderBars('agg-open-bars', openAgg, 'var(--yellow)', '');
 }
 
+// Buckets a visitor into "YYYY-MM" by their session start time, so a busy
+// month (100+ visitors) can be filtered down to a manageable slice instead
+// of showing every visitor ever recorded at once.
+function visitorMonthKey(v) {
+  const d = parseSessionTime(v.startTime);
+  if (!d) return null;
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+function formatMonthLabel(key) {
+  const parts = key.split('-').map(Number);
+  const d = new Date(parts[0], parts[1] - 1, 1);
+  try { return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); } catch (e) { return key; }
+}
+
 function applyFilters() {
   allVisitors = extractVisitors(rawData);
-  spFilteredVisitors = filterState.salesPerson === 'ALL' ? allVisitors : allVisitors.filter(v => v.salesPerson === filterState.salesPerson);
+  monthFilteredVisitors = filterState.month === 'ALL' ? allVisitors : allVisitors.filter(v => visitorMonthKey(v) === filterState.month);
+  spFilteredVisitors = filterState.salesPerson === 'ALL' ? monthFilteredVisitors : monthFilteredVisitors.filter(v => v.salesPerson === filterState.salesPerson);
   if (filterState.visitor !== 'ALL' && !spFilteredVisitors.find(v => v.key === filterState.visitor)) filterState.visitor = 'ALL';
   scopedVisitors = filterState.visitor === 'ALL' ? spFilteredVisitors : spFilteredVisitors.filter(v => v.key === filterState.visitor);
 }
+
+// Long lists (100+ visitors) get a live-filter search box at the top of the
+// menu; short lists render exactly as before. The menu itself is also
+// height-capped with its own scroll (see CSS), so it never renders an
+// unbounded column of options off the bottom of the screen.
+const DROPDOWN_SEARCH_THRESHOLD = 8;
 
 function buildDropdown(triggerId, menuId, wrapId, options, selectedValue, allLabel, onSelect) {
   const trigger = document.getElementById(triggerId), menu = document.getElementById(menuId), wrap = document.getElementById(wrapId);
   if (!trigger || !menu || !wrap) return;
   const selOpt = options.find(o => (typeof o === 'string' ? o : o.value) === selectedValue);
   trigger.textContent = selectedValue === 'ALL' ? allLabel : (selOpt ? (typeof selOpt === 'string' ? selOpt : selOpt.label) : selectedValue);
-  menu.innerHTML = options.map(opt => {
+
+  const normalized = options.map(opt => {
     const val = typeof opt === 'string' ? opt : opt.value;
     const label = typeof opt === 'string' ? (opt === 'ALL' ? allLabel : opt) : opt.label;
-    return `<div class="custom-select-option ${val === selectedValue ? 'selected' : ''}" data-value="${escapeHtml(val)}">${escapeHtml(label)}</div>`;
-  }).join('');
-  wrap.onclick = (e) => { e.stopPropagation(); document.querySelectorAll('.custom-select-options.open').forEach(m => { if (m !== menu) m.classList.remove('open'); }); menu.classList.toggle('open'); };
-  menu.querySelectorAll('.custom-select-option').forEach(opt => {
-    opt.onclick = (e) => { e.stopPropagation(); menu.classList.remove('open'); onSelect(opt.dataset.value); };
+    return { val, label };
+  });
+  const useSearch = normalized.length > DROPDOWN_SEARCH_THRESHOLD;
+
+  function renderOptions(term) {
+    const t = (term || '').trim().toLowerCase();
+    const filtered = t ? normalized.filter(o => o.label.toLowerCase().includes(t)) : normalized;
+    const listHtml = filtered.length
+      ? filtered.map(o => `<div class="custom-select-option ${o.val === selectedValue ? 'selected' : ''}" data-value="${escapeHtml(o.val)}">${escapeHtml(o.label)}</div>`).join('')
+      : `<div class="custom-select-empty">No matches</div>`;
+    const listEl = menu.querySelector('.custom-select-list');
+    (listEl || menu).innerHTML = listHtml;
+    (listEl || menu).querySelectorAll('.custom-select-option').forEach(opt => {
+      opt.onclick = (e) => { e.stopPropagation(); menu.classList.remove('open'); onSelect(opt.dataset.value); };
+    });
+  }
+
+  if (useSearch) {
+    menu.innerHTML = `<div class="custom-select-search-wrap"><input type="text" class="custom-select-search" placeholder="Search…" /></div><div class="custom-select-list"></div>`;
+    const input = menu.querySelector('.custom-select-search');
+    input.onclick = (e) => e.stopPropagation();
+    input.oninput = (e) => renderOptions(e.target.value);
+    renderOptions('');
+  } else {
+    menu.innerHTML = '';
+    renderOptions('');
+  }
+
+  wrap.onclick = (e) => {
+    e.stopPropagation();
+    document.querySelectorAll('.custom-select-options.open').forEach(m => { m.style.left = ''; m.style.right = ''; if (m !== menu) m.classList.remove('open'); });
+    const opening = !menu.classList.contains('open');
+    menu.classList.toggle('open');
+    if (opening) {
+      // On a narrow screen a right-aligned menu can overflow off the left
+      // edge of the viewport — flip it to left-aligned when that happens,
+      // and nudge it back on screen if it still doesn't fit either way.
+      requestAnimationFrame(() => {
+        const rect = menu.getBoundingClientRect();
+        if (rect.left < 4) {
+          menu.style.right = 'auto';
+          menu.style.left = '0';
+          const rect2 = menu.getBoundingClientRect();
+          if (rect2.right > window.innerWidth - 4) menu.style.left = (window.innerWidth - 4 - rect2.width) + 'px';
+        }
+      });
+      if (useSearch) { const input = menu.querySelector('.custom-select-search'); if (input) { input.value = ''; renderOptions(''); setTimeout(() => input.focus(), 0); } }
+    }
+  };
+}
+
+function populateMonthDropdown() {
+  const keys = [...new Set(allVisitors.map(visitorMonthKey).filter(Boolean))].sort().reverse();
+  const options = ['ALL', ...keys.map(k => ({ value: k, label: formatMonthLabel(k) }))];
+  buildDropdown('month-selected-text', 'month-dropdown-menu', 'month-filter-wrap', options, filterState.month, 'All Time', val => {
+    filterState.month = val;
+    const pool = val === 'ALL' ? allVisitors : allVisitors.filter(v => visitorMonthKey(v) === val);
+    if (filterState.salesPerson !== 'ALL' && !pool.some(v => v.salesPerson === filterState.salesPerson)) filterState.salesPerson = 'ALL';
+    if (filterState.visitor !== 'ALL' && !pool.some(v => v.key === filterState.visitor)) filterState.visitor = 'ALL';
+    renderDashboard();
   });
 }
 
 function populateSalesPersonDropdown() {
-  const names = [...new Set(allVisitors.map(v => v.salesPerson))].sort();
+  const names = [...new Set(monthFilteredVisitors.map(v => v.salesPerson))].sort();
   buildDropdown('sp-selected-text', 'sp-dropdown-menu', 'salesperson-filter-wrap', ['ALL', ...names], filterState.salesPerson, 'All Sales Persons', val => {
     filterState.salesPerson = val;
     if (filterState.visitor !== 'ALL') {
@@ -1423,7 +1562,7 @@ function populateSalesPersonDropdown() {
 }
 
 function populateVisitorDropdown() {
-  const pool = filterState.salesPerson === 'ALL' ? allVisitors : allVisitors.filter(v => v.salesPerson === filterState.salesPerson);
+  const pool = filterState.salesPerson === 'ALL' ? monthFilteredVisitors : monthFilteredVisitors.filter(v => v.salesPerson === filterState.salesPerson);
   const options = ['ALL', ...pool.map(v => ({ value: v.key, label: filterState.salesPerson === 'ALL' ? `${v.id} (${v.salesPerson})` : v.id }))];
   buildDropdown('visitor-selected-text', 'visitor-dropdown-menu', 'visitor-filter-wrap', options, filterState.visitor, 'All Visitors', val => {
     filterState.visitor = val;
@@ -1439,6 +1578,7 @@ function renderDashboard() {
   if (!rawData) return;
   show('dashboard');
   applyFilters();
+  populateMonthDropdown();
   populateSalesPersonDropdown();
   populateVisitorDropdown();
   updateScopeUI();
@@ -1484,7 +1624,7 @@ function wireStaticUI() {
   });
 
   document.getElementById('reset-filters-btn')?.addEventListener('click', () => {
-    filterState.scope = 'global'; filterState.salesPerson = 'ALL'; filterState.visitor = 'ALL';
+    filterState.scope = 'global'; filterState.month = 'ALL'; filterState.salesPerson = 'ALL'; filterState.visitor = 'ALL';
     sortState.features = { key: null, dir: 'asc' };
     sortState.apartments = { key: null, dir: 'asc' };
     sortState.visitors = { key: 'start', dir: 'asc' };
@@ -1571,7 +1711,7 @@ function exportPDF() {
     const visitors = scopedVisitors;
 
     section('Sales Person Analytics');
-    const spStats = computeSalesPersonStats(allVisitors);
+    const spStats = computeSalesPersonStats(monthFilteredVisitors);
     table(['Sales Person', 'Visitors', 'Total Time', 'Avg Duration', 'Screenshots', 'Favorites', 'Apartments Viewed', 'Top Feature'],
       spStats.map(s => [s.name, String(s.visitorCount), s.totalTime.toFixed(1) + 's', s.avgDuration.toFixed(1) + 's', String(s.screenshots), String(s.favorites), String(s.apartmentsViewed), s.mostPopularFeature]));
 

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ister Tower</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<div id="waiting-screen">
+  <div class="logo"><span class="logo-dot"></span> AnalyticsPulse</div>
+  <div class="pulse-ring"></div>
+  <div class="wait-title">Loading Analytics</div>
+  <div class="wait-msg" id="wait-msg">Fetching visitor and global analytics from Supabase&hellip;</div>
+</div>
+
+<div id="dashboard">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+      </div>
+      <div class="brand-text">
+        <div class="dash-title">Ister Tower</div>
+        <div class="dash-subtitle mono" id="session-label">Session overview</div>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <div class="pdf-export-group" id="pdf-export-group">
+        <button class="icon-btn pdf-main-btn" id="export-pdf-btn" title="Export the currently selected view as PDF">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+          PDF
+        </button>
+        <button class="icon-btn pdf-caret-btn" id="pdf-export-caret" title="More export options" aria-label="More export options">▾</button>
+        <div class="custom-select-options" id="pdf-export-menu">
+          <div class="custom-select-option" id="pdf-export-all-opt">Export All (Full Report)</div>
+        </div>
+      </div>
+      <button class="theme-toggle" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle theme">
+        <span class="knob">
+          <svg id="theme-icon-sun" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg id="theme-icon-moon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+        </span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Hierarchical filter bar (Scope → Visitor → Sales Person) ── -->
+  <div class="filter-bar">
+    <div class="scope-toggle" id="scope-toggle">
+      <button class="scope-btn" data-scope="global">Global Analytics</button>
+      <button class="scope-btn" data-scope="user">User / Section Analytics</button>
+    </div>
+
+    <div class="filter-wrap" id="salesperson-filter-wrap">
+      <span class="filter-label">Sales Person:</span>
+      <div class="custom-select-trigger" id="sp-selected-text">All Sales Persons</div>
+      <div class="custom-select-options" id="sp-dropdown-menu"></div>
+    </div>
+
+    <div class="filter-wrap" id="visitor-filter-wrap">
+      <span class="filter-label">Visitor:</span>
+      <div class="custom-select-trigger" id="visitor-selected-text">All Visitors</div>
+      <div class="custom-select-options" id="visitor-dropdown-menu"></div>
+    </div>
+
+    <button class="reset-filters-btn" id="reset-filters-btn">Reset filters</button>
+  </div>
+
+  <div class="content">
+    <!-- KPIs (change with scope) -->
+    <div id="kpi-section">
+      <div class="kpi-section-title">Key Metrics</div>
+      <div class="kpi-grid" id="kpi-grid"></div>
+    </div>
+
+    <!-- ══════════════════ GLOBAL ANALYTICS VIEW ══════════════════ -->
+    <div class="view-panel" id="global-view">
+
+      <div class="card section-block">
+        <div class="card-title"><span class="dot" style="background:var(--green)"></span>Conversion Funnel <span style="color:var(--muted);font-weight:500;font-size:.7rem;">(all-time totals)</span></div>
+        <div class="card-hint">Client journey stage conversions recorded across the whole project.</div>
+        <div class="funnel-grid" id="funnel-grid"></div>
+      </div>
+
+      <div class="card section-block">
+        <div class="card-title"><span class="dot" style="background:var(--yellow)"></span>Global Clicks</div>
+        <div class="card-hint">Every click event recorded across all features.</div>
+        <div class="bar-group" id="global-clicks-bars"></div>
+      </div>
+
+      <div class="charts-grid section-block">
+        <div class="card"><div class="card-title"><span class="dot" style="background:var(--accent)"></span>Total Time per Feature (sec)</div><div class="bar-group" id="time-bars"></div></div>
+        <div class="card"><div class="card-title"><span class="dot" style="background:var(--accent2)"></span>Avg Time per Feature (sec)</div><div class="bar-group" id="avg-bars"></div></div>
+      </div>
+      <div class="charts-grid section-block">
+        <div class="card"><div class="card-title"><span class="dot" style="background:var(--green)"></span>Click Distribution</div>
+          <div class="donut-wrap"><canvas id="donut-canvas" width="140" height="140"></canvas><div class="donut-legend" id="donut-legend"></div></div>
+        </div>
+        <div class="card"><div class="card-title"><span class="dot" style="background:var(--yellow)"></span>Feature Open Count</div><div class="bar-group" id="open-bars"></div></div>
+      </div>
+
+      <div class="card section-block">
+        <div class="card-title"><span class="dot" style="background:var(--accent3)"></span>Insights</div>
+        <div class="card-hint">Automatically surfaced highlights, validated against the underlying feature data.</div>
+        <div class="kv-grid" id="insights-grid"></div>
+      </div>
+
+      <div class="card section-block">
+        <div class="card-title"><span class="dot" style="background:var(--accent3)"></span>Full Feature Breakdown</div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr id="feature-table-head">
+              <th class="sortable" data-key="name">Feature</th><th class="sortable" data-key="clicks">Clicks</th><th class="sortable" data-key="opens">Opens</th><th class="sortable" data-key="total">Total Time (sec)</th><th class="sortable" data-key="avg">Avg Time (sec)</th><th>Engagement</th>
+            </tr></thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════ USER / SECTION AGGREGATE VIEW ══════════════════ -->
+    <div class="view-panel" id="user-aggregate-view">
+
+      <div class="card section-block">
+        <div class="card-title"><span class="dot" style="background:var(--green)"></span>Sales Person Analytics</div>
+        <div class="card-hint">Click a sales person to filter the whole dashboard to their visitors.</div>
+        <div class="sp-card-grid" id="sp-card-grid"></div>
+      </div>
+
+      <div class="card section-block">
+        <div class="card-title"><span class="dot" style="background:var(--green)"></span>Session Outcome Distribution</div>
+        <div class="card-hint">Derived from each visitor's recorded session outcome, for the current filter.</div>
+        <div class="funnel-grid" id="outcome-funnel-grid"></div>
+      </div>
+
+      <div class="card section-block">
+        <div class="card-title"><span class="dot" style="background:var(--yellow)"></span>Top Interests</div>
+        <div class="card-hint">Every screen &amp; sub-action opened, ranked by aggregated total time spent (hierarchy analytics).</div>
+        <div id="top-interests"></div>
+      </div>
+
+      <div class="charts-grid section-block">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--accent)"></span>Most Engaged Visitors</div>
+          <div class="card-hint">Visitors ranked by total feature time.</div>
+          <div id="engagement-leaderboard"></div>
+          <div class="pager" id="engagement-pager"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--accent2)"></span>Environment &amp; Weather Context</div>
+          <div class="card-hint">Last known state plus aggregated time-of-day &amp; weather selection counts.</div>
+          <div id="env-context"></div>
+        </div>
+      </div>
+
+      <div class="card section-block">
+        <div class="card-title"><span class="dot" style="background:var(--accent3)"></span>Visitor Apartment Interactions</div>
+        <div class="card-hint">Aggregated per-apartment interaction data recorded by the currently filtered visitors.</div>
+        <div class="mini-card-grid" id="visitor-apartment-analytics"></div>
+      </div>
+
+      <div class="card section-block">
+        <div class="card-title"><span class="dot" style="background:var(--green)"></span>All Visitors</div>
+        <div class="card-hint">Detailed list of every visitor session recorded under sales persons. Click a row for the full profile.</div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr id="users-table-head">
+              <th class="sortable" data-key="id">Visitor Name</th><th class="sortable" data-key="sp">Sales Agent</th><th class="sortable" data-key="outcome">Outcome</th><th class="sortable" data-key="screenshots">Screenshots</th><th class="sortable" data-key="start">Started</th><th>Ended</th><th class="sortable" data-key="durMs">Duration</th>
+            </tr></thead>
+            <tbody id="users-table-body"></tbody>
+          </table>
+        </div>
+        <div class="pager" id="users-pager"></div>
+      </div>
+
+      <div class="card section-block">
+        <div class="card-title"><span class="dot" style="background:var(--yellow)"></span>User Journey Flow</div>
+        <div class="card-hint">Sequential step-by-step path taken by each visitor, including filter state &amp; sub-actions.</div>
+        <div id="user-journeys"></div>
+        <div class="pager" id="journeys-pager"></div>
+      </div>
+
+      <div class="charts-grid section-block">
+        <div class="card"><div class="card-title"><span class="dot" style="background:var(--accent)"></span>Total Time per Feature (sec)</div><div class="bar-group" id="agg-time-bars"></div></div>
+        <div class="card"><div class="card-title"><span class="dot" style="background:var(--accent2)"></span>Feature Open Count (derived)</div><div class="bar-group" id="agg-open-bars"></div></div>
+      </div>
+
+      <div class="card section-block">
+        <div class="card-title"><span class="dot" style="background:var(--accent2)"></span>Hierarchy Analytics Explorer</div>
+        <div class="card-hint">Browse every nested section, sub-action, and option. Click cards to navigate deeper.</div>
+        <div class="explorer-crumbs" id="explorer-crumbs"></div>
+        <div class="explorer-grid" id="explorer-grid"></div>
+        <div class="explorer-leaf" id="explorer-leaf" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════ VISITOR FOCUS VIEW (specific visitor selected) ══════════════════ -->
+    <div class="view-panel" id="visitor-focus-view">
+      <div class="card section-block" id="visitor-focus-content"></div>
+    </div>
+
+    <!-- Apartment Registry — global reference data, hidden while viewing one specific visitor -->
+    <div class="card section-block" id="apartment-registry-card">
+      <div class="card-title"><span class="dot" style="background:var(--accent3)"></span>Apartment Registry Performance</div>
+      <div class="card-hint">Unit activity including views, favorites, PDF downloads, balcony and floor cut interactions.</div>
+      <div class="registry-note" id="registry-note" style="display:none">Building &amp; status weren't found in the loaded registry — figures below are estimated from visitor activity instead.</div>
+      <div class="mini-card-toolbar">
+        <div class="filter-wrap" id="apartment-sort-wrap">
+          <span class="filter-label">Sort by:</span>
+          <div class="custom-select-trigger" id="apartment-sort-text">Unit ID</div>
+          <div class="custom-select-options" id="apartment-sort-menu"></div>
+        </div>
+        <button class="reset-filters-btn" id="apartment-sort-dir-btn">↑ Asc</button>
+      </div>
+      <div class="mini-card-grid" id="apartment-registry-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Visitor detail slide-over drawer -->
+<div class="drawer-overlay" id="visitor-drawer-overlay">
+  <div class="drawer-panel" id="visitor-drawer-panel">
+    <div class="drawer-inner">
+      <button class="drawer-close" id="drawer-close" aria-label="Close">×</button>
+      <div id="drawer-content"></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

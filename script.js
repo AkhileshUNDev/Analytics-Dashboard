@@ -107,26 +107,15 @@ function renderKVGrid(obj, labelMap, wideKeys) {
 function renderFilterUsage(fu) {
   if (!fu || !Object.keys(fu).length) return emptyState('No filter usage recorded.');
   const known = ['PriceRange', 'SurfaceRange', 'FloorRange', 'SelectedRooms', 'SelectedBuildings', 'SelectedStatus', 'FilteredApartmentCount'];
-
-  // Simple single-value metrics stay in compact boxes — they're all short,
-  // so the boxes stay short and uniform with nothing to leave empty.
-  let statItems = '';
-  if (fu.PriceRange && typeof fu.PriceRange === 'object') statItems += kvItem('Price', fmtMoney(fu.PriceRange.Min) + ' → ' + fmtMoney(fu.PriceRange.Max), true);
-  if (fu.SurfaceRange && typeof fu.SurfaceRange === 'object') statItems += kvItem('Surface (m²)', fmtNum(fu.SurfaceRange.Min) + ' → ' + fmtNum(fu.SurfaceRange.Max));
-  if (fu.FloorRange && typeof fu.FloorRange === 'object') statItems += kvItem('Floor', fmtNum(fu.FloorRange.Min) + ' → ' + fmtNum(fu.FloorRange.Max));
-  if (fu.FilteredApartmentCount != null) statItems += kvItem('Filtered Apartments', fu.FilteredApartmentCount);
-
-  // Multi-select filters (variable number of chips) get flowing label+chip
-  // rows instead of a boxed card — there's no box height to mismatch, since
-  // there's no box at all.
-  let tagRows = '';
-  if (fu.SelectedRooms) tagRows += `<div class="filter-tag-row"><span class="filter-tag-label">Rooms</span>${formatDynVal(fu.SelectedRooms)}</div>`;
-  if (fu.SelectedBuildings) tagRows += `<div class="filter-tag-row"><span class="filter-tag-label">Buildings</span>${formatDynVal(fu.SelectedBuildings)}</div>`;
-  if (fu.SelectedStatus) tagRows += `<div class="filter-tag-row"><span class="filter-tag-label">Status</span>${formatDynVal(fu.SelectedStatus)}</div>`;
-
-  let html = statItems ? `<div class="kv-grid">${statItems}</div>` : '';
-  if (tagRows) html += `<div class="filter-tag-rows">${tagRows}</div>`;
-
+  let items = '';
+  if (fu.PriceRange && typeof fu.PriceRange === 'object') items += kvItem('Price', fmtMoney(fu.PriceRange.Min) + ' → ' + fmtMoney(fu.PriceRange.Max), true);
+  if (fu.SurfaceRange && typeof fu.SurfaceRange === 'object') items += kvItem('Surface (m²)', fmtNum(fu.SurfaceRange.Min) + ' → ' + fmtNum(fu.SurfaceRange.Max));
+  if (fu.FloorRange && typeof fu.FloorRange === 'object') items += kvItem('Floor', fmtNum(fu.FloorRange.Min) + ' → ' + fmtNum(fu.FloorRange.Max));
+  if (fu.SelectedRooms) items += `<div class="kv-item"><div class="kv-label">Rooms</div>${formatDynVal(fu.SelectedRooms)}</div>`;
+  if (fu.SelectedBuildings) items += `<div class="kv-item"><div class="kv-label">Buildings</div>${formatDynVal(fu.SelectedBuildings)}</div>`;
+  if (fu.SelectedStatus) items += `<div class="kv-item"><div class="kv-label">Status</div>${formatDynVal(fu.SelectedStatus)}</div>`;
+  if (fu.FilteredApartmentCount != null) items += kvItem('Filtered Apartments', fu.FilteredApartmentCount);
+  let html = items ? `<div class="kv-grid">${items}</div>` : '';
   const extraKeys = Object.keys(fu).filter(k => !known.includes(k));
   if (extraKeys.length) {
     const extraObj = {}; extraKeys.forEach(k => extraObj[k] = fu[k]);
@@ -143,7 +132,7 @@ function renderFavoritedUnits(favUnits, apartmentAnalytics, registry) {
     return `<div class="mini-card">
       <div class="mini-card-title">
         <span>${escapeHtml(unitId)}</span>
-        <span class="mini-card-badges"><span class="badge badge-pink">❤️ Favorite</span></span>
+        <span class="mini-card-badges"><span class="badge badge-yellow">Favorite</span></span>
       </div>
       <div class="mini-card-sub">${reg ? escapeHtml(reg.Building || '-') + ' · ' + escapeHtml(reg.Status || '-') : 'Not found in registry'}</div>
       <div class="mini-card-stats">
@@ -165,7 +154,7 @@ function renderApartmentAnalyticsCards(aa, registry, favoritedUnits) {
       <div class="mini-card-title">
         <span>${escapeHtml(unitId)}</span>
         <span class="mini-card-badges">
-          ${isFav ? '<span class="badge badge-pink">❤️ Favorite</span>' : ''}
+          ${isFav ? '<span class="badge badge-yellow">Favorite</span>' : ''}
           ${data.PdfOpened ? '<span class="badge badge-yes">PDF</span>' : ''}
         </span>
       </div>
@@ -187,12 +176,13 @@ function withIcon(map, val) { return val && map[val] ? `${map[val]} ${val}` : va
 function renderEnvironmentDetail(env) {
   env = env || {};
   let html = sectionTitle('Environment');
-  html += '<div class="env-section"><div class="env-section-title">Last Known State</div>' + (renderKVGrid({
+  html += '<div class="env-section-title">Last Known State</div>';
+  html += renderKVGrid({
     LastClockTime: env.LastClockTime,
     LastDate: env.LastDate,
     LastTimeOfDay: withIcon(TIME_OF_DAY_ICONS, env.LastTimeOfDay),
     LastWeather: withIcon(WEATHER_ICONS, env.LastWeather)
-  }, { LastClockTime: 'Clock', LastDate: 'Date', LastTimeOfDay: 'Time of Day', LastWeather: 'Weather' }, ['LastDate']) || emptyState('No last-state data recorded.')) + '</div>';
+  }, { LastClockTime: 'Clock', LastDate: 'Date', LastTimeOfDay: 'Time of Day', LastWeather: 'Weather' }, ['LastDate']) || emptyState('No last-state data recorded.');
   html += chipCountsSection('Time of Day Selections', env.TimeOfDaySelectionCounts, TIME_OF_DAY_ICONS);
   html += chipCountsSection('Weather Selections', env.WeatherSelectionCounts, WEATHER_ICONS);
   const known = ['LastClockTime', 'LastDate', 'LastTimeOfDay', 'LastWeather', 'TimeOfDaySelectionCounts', 'WeatherSelectionCounts'];
@@ -211,34 +201,20 @@ function chipCountsSection(title, obj, iconMap) {
   return `<div class="env-section"><div class="env-section-title">${escapeHtml(title)}</div>${body}</div>`;
 }
 
-// Same split used for the main Filter Usage panel: simple range/count
-// values stay in compact boxes, multi-select chip lists (Rooms/Buildings)
-// become flowing label+chip rows instead of boxes — so there's nothing to
-// leave empty when the chip count varies.
-function renderJourneyFilterState(fs) {
-  if (!fs) return '';
-  const statFields = { PriceRange: 'Price Range', SurfaceRange: 'Surface Range', FloorRange: 'Floor Range', FilteredCount: 'Filtered Count' };
-  const tagFields = { SelectedRooms: 'Rooms', SelectedBuildings: 'Buildings' };
-
-  let statItems = '';
-  Object.keys(statFields).forEach(k => { if (fs[k] !== undefined) statItems += kvItem(statFields[k], fs[k], k === 'PriceRange'); });
-
-  let tagRows = '';
-  Object.keys(tagFields).forEach(k => { if (fs[k] !== undefined) tagRows += `<div class="filter-tag-row"><span class="filter-tag-label">${escapeHtml(tagFields[k])}</span>${formatDynVal(fs[k])}</div>`; });
-
-  let html = statItems ? `<div class="kv-grid">${statItems}</div>` : '';
-  if (tagRows) html += `<div class="filter-tag-rows">${tagRows}</div>`;
-
-  const known = Object.keys(statFields).concat(Object.keys(tagFields));
-  const extraKeys = Object.keys(fs).filter(k => !known.includes(k));
-  if (extraKeys.length) { const eo = {}; extraKeys.forEach(k => eo[k] = fs[k]); html += renderKVGrid(eo); }
-  return html;
-}
-
 function renderJourneyStepsHTML(journey) {
   if (!journey || !journey.length) return emptyState('No journey recorded.');
+  const filterFieldOrder = ['PriceRange', 'SurfaceRange', 'FloorRange', 'FilteredCount', 'SelectedRooms', 'SelectedBuildings'];
   return '<div class="journey-timeline">' + journey.map((j, i) => {
-    const filterHtml = j.FilterState ? `<div class="js-filterstate">${renderJourneyFilterState(j.FilterState)}</div>` : '';
+    let filterHtml = '';
+    if (j.FilterState) {
+      const fs = j.FilterState, ordered = {};
+      filterFieldOrder.forEach(k => { if (fs[k] !== undefined) ordered[k] = fs[k]; });
+      Object.keys(fs).forEach(k => { if (!(k in ordered)) ordered[k] = fs[k]; });
+      filterHtml = `<div class="js-filterstate">${renderKVGrid(ordered, {
+        PriceRange: 'Price Range', SurfaceRange: 'Surface Range', FloorRange: 'Floor Range',
+        SelectedRooms: 'Rooms', SelectedBuildings: 'Buildings', FilteredCount: 'Filtered Count'
+      }, ['PriceRange', 'SelectedBuildings'])}</div>`;
+    }
     const sub = j.SubActions && j.SubActions.length
       ? `<div class="chip-list journey-tchips">${j.SubActions.map(s => `<span class="chip">${escapeHtml(s)}</span>`).join('')}</div>` : '';
     return `<div class="journey-titem">
@@ -294,12 +270,11 @@ const META_KEYS = ['ClickCount', 'OpenCount', 'TotalTime', 'AverageTime', 'LastO
 // ── Global state ─────────────────────────────────────────────
 let rawData = null;
 let allVisitors = [];         // every visitor, flattened & derived
-let monthFilteredVisitors = []; // filtered by month only (drives sales-person dropdown & stats)
-let spFilteredVisitors = [];  // filtered by month + salesPerson (drives visitor dropdown)
-let scopedVisitors = [];      // filtered by month + salesPerson + visitor (drives aggregate/detail rendering)
+let spFilteredVisitors = [];  // filtered by salesPerson only (drives visitor dropdown)
+let scopedVisitors = [];      // filtered by salesPerson + visitor (drives aggregate/detail rendering)
 let currentLeaves = [];       // flattened hierarchy leaves (used by Top Interests + PDF)
 
-const filterState = { scope: 'global', month: 'ALL', salesPerson: 'ALL', visitor: 'ALL' };
+const filterState = { scope: 'global', salesPerson: 'ALL', visitor: 'ALL' };
 const sortState = {
   features: { key: null, dir: 'asc' },
   apartments: { key: null, dir: 'asc' },
@@ -380,7 +355,6 @@ function pickFieldFrom(sources, camelKey, snakeKey, fallback) {
 function normalizeVisitorPayload(payload, secondarySource) {
   const sources = [payload || {}, secondarySource || {}];
   return {
-    PhoneNumber: pickFieldFrom(sources, 'PhoneNumber', 'phone_number', ''),
     SessionStartTime: pickFieldFrom(sources, 'SessionStartTime', 'session_start_time', ''),
     SessionEndTime: pickFieldFrom(sources, 'SessionEndTime', 'session_end_time', ''),
     SessionOutcome: pickFieldFrom(sources, 'SessionOutcome', 'session_outcome', 'Presentation'),
@@ -408,7 +382,7 @@ function isEmptyValue(v) {
 // row that fails to parse (wrong column/wrapper name) from wiping out a
 // visitor that was already populated from another source.
 function mergeVisitorRecords(base, incoming) {
-  const fields = ['PhoneNumber', 'SessionStartTime', 'SessionEndTime', 'SessionOutcome', 'AppEvents', 'FilterUsage',
+  const fields = ['SessionStartTime', 'SessionEndTime', 'SessionOutcome', 'AppEvents', 'FilterUsage',
     'FavoritedUnits', 'ApartmentAnalytics', 'FeatureTimeInSeconds', 'UserJourneyHierarchy', 'Environment', 'HierarchyAnalytics'];
   const merged = {};
   fields.forEach(f => {
@@ -547,6 +521,12 @@ function reconstructFromSupabase(userRows, globalRows) {
 }
 
 async function fetchAnalyticsFromSupabase() {
+  const { data: authData, error: authError } = await supabaseClient.auth.getSession();
+  if (authError || !authData?.session) {
+    setAuthGate(true);
+    return;
+  }
+
   const waitMsg = document.getElementById('wait-msg');
   if (waitMsg) waitMsg.textContent = 'Fetching visitor and global analytics from Supabase…';
 
@@ -554,10 +534,7 @@ async function fetchAnalyticsFromSupabase() {
     const headers = {
       "apikey": SUPABASE_ANON_KEY,
       "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-      "Content-Type": "application/json",
-      "Range-Unit": "items",
-      "Range": "0-19999",
-      "Prefer": "count=exact"
+      "Content-Type": "application/json"
     };
 
     const [userRes, globalRes] = await Promise.all([
@@ -566,15 +543,7 @@ async function fetchAnalyticsFromSupabase() {
     ]);
 
     if (!userRes.ok) throw new Error(`user_sessions: ${userRes.status} ${userRes.statusText}`);
-    
     const userRows = await userRes.json();
-
-    // Check if RLS blocked the response (returns [] even if rows exist in database)
-    if (userRows.length === 0) {
-      console.warn("No rows returned. Ensure Row Level Security (RLS) SELECT policies exist for 'anon'.");
-    }
-
-    warnIfTruncated('user_sessions (visitors)', userRes, userRows.length);
 
     let globalRows = [];
     if (globalRes.ok) {
@@ -589,25 +558,189 @@ async function fetchAnalyticsFromSupabase() {
   }
 }
 
-// PostgREST returns a Content-Range header like "0-999/1532" — the part
-// after the slash is the TRUE total row count on the server, which can be
-// larger than what actually came back if a server-side row cap (db-max-rows)
-// kicked in. Surfaces a visible warning rather than failing silently.
-function warnIfTruncated(label, res, fetchedCount) {
-  const contentRange = res.headers && res.headers.get ? res.headers.get('content-range') : null;
-  if (!contentRange) return;
-  const m = contentRange.match(/\/(\d+)$/);
-  if (!m) return;
-  const total = parseInt(m[1], 10);
-  if (total > fetchedCount) {
-    console.warn(`Supabase ${label}: fetched ${fetchedCount} of ${total} total rows — some visitors are not shown. Raise the Range header above, or increase your Supabase project's db-max-rows setting.`);
-    toast(`Showing ${fetchedCount} of ${total} visitors — data limit reached`, 'info', 7000);
+/* ══════════════════════════════════════════════════════════════
+   AUTHENTICATION — Supabase Auth + dashboard gate
+   The anon/publishable key is safe for frontend use only when
+   database RLS policies protect the data. Never use service_role here.
+   ══════════════════════════════════════════════════════════════ */
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function setAuthGate(show) {
+  const gate = document.getElementById('auth-gate');
+  if (!gate) return;
+  gate.setAttribute('aria-hidden', show ? 'false' : 'true');
+}
+
+function showAuthError(message) {
+  const el = document.getElementById('auth-error');
+  if (!el) return;
+  el.textContent = message || 'Unable to sign in.';
+  el.hidden = false;
+}
+
+function clearAuthError() {
+  const el = document.getElementById('auth-error');
+  if (!el) return;
+  el.hidden = true;
+  el.textContent = '';
+}
+
+async function handleLogin(event) {
+  event.preventDefault();
+  clearAuthError();
+
+  const email = document.getElementById('auth-email')?.value.trim();
+  const password = document.getElementById('auth-password')?.value || '';
+  const btn = document.getElementById('auth-login-btn');
+  const text = document.getElementById('auth-login-text');
+
+  if (!email || !password) {
+    showAuthError('Please enter your email and password.');
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  if (text) text.textContent = 'Signing in…';
+
+  try {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) throw error;
+    if (!data?.session) throw new Error('Login succeeded but no session was returned.');
+
+    setAuthGate(false);
+
+    // Only fetch analytics after successful authentication.
+    await fetchAnalyticsFromSupabase();
+  } catch (error) {
+    console.error('Supabase authentication error:', error);
+    showAuthError(error?.message || 'Invalid email or password.');
+    setAuthGate(true);
+  } finally {
+    if (btn) btn.disabled = false;
+    if (text) text.textContent = 'Sign in';
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  fetchAnalyticsFromSupabase();
+async function handleLogout() {
+  try {
+    await supabaseClient.auth.signOut();
+  } catch (error) {
+    console.error('Sign out error:', error);
+  } finally {
+    rawData = null;
+    setAuthGate(true);
+  }
+}
+
+async function initializeAuthentication() {
+  setAuthGate(true);
+
+  const { data, error } = await supabaseClient.auth.getSession();
+  if (error) {
+    console.error('Supabase session error:', error);
+    return;
+  }
+
+  if (data?.session) {
+    setAuthGate(false);
+    await fetchAnalyticsFromSupabase();
+  }
+
+  const { data: listener } = supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+    if (session) {
+      setAuthGate(false);
+      // Do not fetch twice for the initial session if data is already loaded.
+      if (!rawData) await fetchAnalyticsFromSupabase();
+    } else {
+      rawData = null;
+      setAuthGate(true);
+    }
+  });
+
+  window.addEventListener('beforeunload', () => {
+    try { listener?.subscription?.unsubscribe(); } catch (e) {}
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('auth-login-form')?.addEventListener('submit', handleLogin);
+  document.getElementById('auth-logout-btn')?.addEventListener('click', handleLogout);
+
+  document.getElementById('auth-toggle-password')?.addEventListener('click', () => {
+    const input = document.getElementById('auth-password');
+    const button = document.getElementById('auth-toggle-password');
+    if (!input || !button) return;
+    const visible = input.type === 'text';
+    input.type = visible ? 'password' : 'text';
+    button.textContent = visible ? 'Show' : 'Hide';
+    button.setAttribute('aria-label', visible ? 'Show password' : 'Hide password');
+  });
+
+  // Existing dashboard UI can be wired immediately; data is gated.
   wireStaticUI();
+  initializeAuthentication();
+});
+
+// Add or replace your existing sign-out event listener with this:
+document.getElementById('auth-logout-btn')?.addEventListener('click', async () => {
+  try {
+    // 1. Sign out from Supabase (if using Supabase Auth)
+    if (typeof supabase !== 'undefined' && supabase.auth) {
+      await supabase.auth.signOut();
+    }
+
+    // 2. Clear input fields in the login form
+    const loginForm = document.getElementById('auth-login-form');
+    if (loginForm) {
+      loginForm.reset();
+    } else {
+      // Fallback manual reset if form element is not targeted directly
+      const emailInput = document.getElementById('auth-email');
+      const passwordInput = document.getElementById('auth-password');
+      if (emailInput) emailInput.value = '';
+      if (passwordInput) passwordInput.value = '';
+    }
+
+    // 3. Reset password toggle state if hidden/shown
+    const passwordInput = document.getElementById('auth-password');
+    const toggleBtn = document.getElementById('auth-toggle-password');
+    if (passwordInput && toggleBtn) {
+      passwordInput.type = 'password';
+      toggleBtn.textContent = 'Show';
+    }
+
+    // 4. Hide and clear any leftover authentication error messages
+    const errorEl = document.getElementById('auth-error');
+    if (errorEl) {
+      errorEl.textContent = '';
+      errorEl.hidden = true;
+    }
+
+    // 5. Display the auth gate overlay again
+    const authGate = document.getElementById('auth-gate');
+    if (authGate) {
+      authGate.setAttribute('aria-hidden', 'false');
+    }
+
+  } catch (error) {
+    console.error('Error during sign out:', error);
+  }
+});
+document.getElementById('auth-logout-btn')?.addEventListener('click', async () => {
+  // Hide main dashboard content immediately on sign-out
+  const dashboard = document.getElementById('dashboard');
+  if (dashboard) dashboard.style.display = 'none';
+
+  // Reset form inputs
+  document.getElementById('auth-login-form')?.reset();
+
+  // Show auth gate
+  const authGate = document.getElementById('auth-gate');
+  if (authGate) authGate.setAttribute('aria-hidden', 'false');
 });
 
 // Manual data-injection entry point (e.g. Unreal / dev testing)
@@ -645,7 +778,6 @@ function extractVisitors(data) {
             key: spName + '::' + vName,
             id: vName,
             salesPerson: spName,
-            phoneNumber: vData.PhoneNumber || '-',
             startTime: vData.SessionStartTime || '',
             endTime: vData.SessionEndTime || '',
             durationMs: (start && end) ? (end - start) : null,
@@ -671,10 +803,37 @@ function extractVisitors(data) {
 
 function currentRegistry() { return (rawData && rawData.ApartmentRegistry) || {}; }
 
-// Always the real registry — no synthesized "Unknown" fallback data. If it's
-// empty, the UI should show a clean empty state, not fabricated cards.
+// If the real ApartmentRegistry never loaded (data gap on the Supabase side),
+// derive a partial one from every visitor's ApartmentAnalytics/FavoritedUnits
+// so the registry section and unit lookups are never just blank. Building
+// and Status can't be recovered this way, so they're marked "Unknown".
+function buildDerivedRegistry() {
+  const reg = {};
+  const ensure = (unitId) => {
+    if (!reg[unitId]) reg[unitId] = { Building: 'Unknown', Status: 'Unknown', TotalViews: 0, TotalFavorites: 0, TotalPdfOpens: 0, TotalBalconyViews: 0, TotalFloorCutViews: 0 };
+    return reg[unitId];
+  };
+  allVisitors.forEach(v => {
+    Object.entries(v.apartmentAnalytics || {}).forEach(([unitId, d]) => {
+      const r = ensure(unitId);
+      r.TotalViews += d.ViewCount || 0;
+      r.TotalPdfOpens += d.PdfOpened ? 1 : 0;
+      r.TotalBalconyViews += d.BalconyViewCount || 0;
+      r.TotalFloorCutViews += d.FloorCutViewCount || 0;
+    });
+    (v.favoritedUnits || []).forEach(unitId => { ensure(unitId).TotalFavorites += 1; });
+  });
+  return reg;
+}
+
+// Returns { registry, derived } — the real registry when it has data,
+// otherwise a best-effort derived one with `derived: true` so callers can
+// show an honest "estimated from visitor activity" note instead of blanking.
 function effectiveRegistry() {
-  return { registry: currentRegistry(), derived: false };
+  const real = currentRegistry();
+  if (Object.keys(real).length) return { registry: real, derived: false };
+  const derived = buildDerivedRegistry();
+  return { registry: derived, derived: Object.keys(derived).length > 0 };
 }
 
 function computeSalesPersonStats(visitors) {
@@ -984,18 +1143,6 @@ function renderJourneySummaryChips(journey) {
   return `<div class="chip-list journey-summary-chips">${journey.map((j, i) => `<span class="chip">${i + 1}. ${escapeHtml(j.Action || '—')}</span>`).join('')}</div>`;
 }
 
-// Compact by default (numbered summary chips), full timeline available via
-// a collapsible toggle — used identically for the multi-visitor list and
-// the single-visitor detail view, so both look and behave the same way.
-function renderJourneyCollapsible(journey) {
-  if (!journey || !journey.length) return emptyState('No journey recorded.');
-  return `${renderJourneySummaryChips(journey)}
-    <details class="journey-details">
-      <summary>View step-by-step details</summary>
-      ${renderJourneyStepsHTML(journey)}
-    </details>`;
-}
-
 function renderUserJourneys(visitors) {
   const el = document.getElementById('user-journeys');
   const pagerEl = document.getElementById('journeys-pager');
@@ -1004,7 +1151,11 @@ function renderUserJourneys(visitors) {
     const dur = (start && end) ? formatDuration(end - start) : null;
     return `<div class="journey-user-row">
       <div class="journey-user-name">${escapeHtml(v.id)} <span class="jun-sp">via ${escapeHtml(v.salesPerson)}</span> ${dur ? `<span class="jun-dur">· ${dur}</span>` : ''}</div>
-      ${renderJourneyCollapsible(v.journey)}
+      ${renderJourneySummaryChips(v.journey)}
+      <details class="journey-details">
+        <summary>View step-by-step details</summary>
+        ${renderJourneyStepsHTML(v.journey)}
+      </details>
     </div>`;
   }, emptyState('No journeys recorded.'));
 }
@@ -1070,7 +1221,7 @@ function buildVisitorDetailHTML(v, prefix) {
     <div class="bar-group" id="${prefix}-feature-bars"></div>
 
     ${sectionTitle('User Journey')}
-    ${renderJourneyCollapsible(v.journey)}
+    ${renderJourneyStepsHTML(v.journey)}
 
     ${renderEnvironmentDetail(v.environment)}
 
@@ -1147,7 +1298,9 @@ function populateApartmentSortDropdown() {
 }
 
 function renderApartmentRegistry() {
-  const { registry } = effectiveRegistry();
+  const { registry, derived } = effectiveRegistry();
+  const noteEl = document.getElementById('registry-note');
+  if (noteEl) noteEl.style.display = derived ? 'block' : 'none';
 
   populateApartmentSortDropdown();
   const st = sortState.apartments;
@@ -1161,12 +1314,11 @@ function renderApartmentRegistry() {
     : sortRows(rows, st.key, st.dir, (r, key) => key === 'Building' ? (r[key] || '') : (r[key] || 0));
 
   const grid = document.getElementById('apartment-registry-grid');
-  const pagerEl = document.getElementById('apartment-registry-pager');
   if (!grid) return;
-  if (!Object.keys(registry).length) { grid.innerHTML = emptyState('No apartment registry data.'); if (pagerEl) pagerEl.innerHTML = ''; return; }
-  if (!rows.length) { grid.innerHTML = emptyState('No apartments found.'); if (pagerEl) pagerEl.innerHTML = ''; return; }
+  if (!Object.keys(registry).length) { grid.innerHTML = emptyState('No apartment registry data.'); return; }
+  if (!rows.length) { grid.innerHTML = emptyState('No apartments found.'); return; }
 
-  createPager(rows, 12, grid, pagerEl, u => `
+  grid.innerHTML = rows.map(u => `
     <div class="mini-card">
       <div class="mini-card-title">
         <span>${escapeHtml(u.id)}</span>
@@ -1181,7 +1333,7 @@ function renderApartmentRegistry() {
         <span>Floor Cut ${u.TotalFloorCutViews || 0}</span>
       </div>
     </div>
-  `, emptyState('No apartments found.'));
+  `).join('');
 }
 
 function renderUsersTable(visitors) {
@@ -1318,11 +1470,9 @@ function showViewPanel(id) {
 
 function updateScopeUI() {
   document.querySelectorAll('.scope-btn').forEach(b => b.classList.toggle('active', b.dataset.scope === filterState.scope));
-  const monthWrap = document.getElementById('month-filter-wrap');
   const spWrap = document.getElementById('salesperson-filter-wrap');
   const visWrap = document.getElementById('visitor-filter-wrap');
   const show = filterState.scope === 'user';
-  if (monthWrap) monthWrap.style.display = show ? 'flex' : 'none';
   if (spWrap) spWrap.style.display = show ? 'flex' : 'none';
   if (visWrap) visWrap.style.display = show ? 'flex' : 'none';
 }
@@ -1331,9 +1481,8 @@ function renderSessionLabel() {
   const el = document.getElementById('session-label');
   if (!el) return;
   if (filterState.scope === 'global') { el.textContent = `${rawData.TotalUsers ?? allVisitors.length} Total Users · Global scope`; return; }
-  const monthPart = filterState.month === 'ALL' ? '' : ` · ${formatMonthLabel(filterState.month)}`;
-  if (filterState.visitor !== 'ALL') { const v = scopedVisitors[0]; el.textContent = v ? `Visitor: ${v.id} · ${v.salesPerson}${monthPart}` : 'Visitor not found'; return; }
-  el.textContent = (filterState.salesPerson === 'ALL' ? `${scopedVisitors.length} Visitors · All Sales Persons` : `${scopedVisitors.length} Visitors · ${filterState.salesPerson}`) + monthPart;
+  if (filterState.visitor !== 'ALL') { const v = scopedVisitors[0]; el.textContent = v ? `Visitor: ${v.id} · ${v.salesPerson}` : 'Visitor not found'; return; }
+  el.textContent = filterState.salesPerson === 'ALL' ? `${scopedVisitors.length} Visitors · All Sales Persons` : `${scopedVisitors.length} Visitors · ${filterState.salesPerson}`;
 }
 
 function renderGlobalView() {
@@ -1365,7 +1514,7 @@ function renderGlobalView() {
 function renderUserAggregateView() {
   const visitors = scopedVisitors;
 
-  const spStats = computeSalesPersonStats(monthFilteredVisitors);
+  const spStats = computeSalesPersonStats(allVisitors);
   const spGrid = document.getElementById('sp-card-grid');
   spGrid.innerHTML = spStats.length ? spStats.map(s => `
     <div class="sp-card ${s.name === filterState.salesPerson ? 'active-sp' : ''}" data-sp="${escapeHtml(s.name)}">
@@ -1422,108 +1571,31 @@ function renderUserAggregateView() {
   renderBars('agg-open-bars', openAgg, 'var(--yellow)', '');
 }
 
-// Buckets a visitor into "YYYY-MM" by their session start time, so a busy
-// month (100+ visitors) can be filtered down to a manageable slice instead
-// of showing every visitor ever recorded at once.
-function visitorMonthKey(v) {
-  const d = parseSessionTime(v.startTime);
-  if (!d) return null;
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-}
-function formatMonthLabel(key) {
-  const parts = key.split('-').map(Number);
-  const d = new Date(parts[0], parts[1] - 1, 1);
-  try { return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); } catch (e) { return key; }
-}
-
 function applyFilters() {
   allVisitors = extractVisitors(rawData);
-  monthFilteredVisitors = filterState.month === 'ALL' ? allVisitors : allVisitors.filter(v => visitorMonthKey(v) === filterState.month);
-  spFilteredVisitors = filterState.salesPerson === 'ALL' ? monthFilteredVisitors : monthFilteredVisitors.filter(v => v.salesPerson === filterState.salesPerson);
+  spFilteredVisitors = filterState.salesPerson === 'ALL' ? allVisitors : allVisitors.filter(v => v.salesPerson === filterState.salesPerson);
   if (filterState.visitor !== 'ALL' && !spFilteredVisitors.find(v => v.key === filterState.visitor)) filterState.visitor = 'ALL';
   scopedVisitors = filterState.visitor === 'ALL' ? spFilteredVisitors : spFilteredVisitors.filter(v => v.key === filterState.visitor);
 }
-
-// Long lists (100+ visitors) get a live-filter search box at the top of the
-// menu; short lists render exactly as before. The menu itself is also
-// height-capped with its own scroll (see CSS), so it never renders an
-// unbounded column of options off the bottom of the screen.
-const DROPDOWN_SEARCH_THRESHOLD = 8;
 
 function buildDropdown(triggerId, menuId, wrapId, options, selectedValue, allLabel, onSelect) {
   const trigger = document.getElementById(triggerId), menu = document.getElementById(menuId), wrap = document.getElementById(wrapId);
   if (!trigger || !menu || !wrap) return;
   const selOpt = options.find(o => (typeof o === 'string' ? o : o.value) === selectedValue);
   trigger.textContent = selectedValue === 'ALL' ? allLabel : (selOpt ? (typeof selOpt === 'string' ? selOpt : selOpt.label) : selectedValue);
-
-  const normalized = options.map(opt => {
+  menu.innerHTML = options.map(opt => {
     const val = typeof opt === 'string' ? opt : opt.value;
     const label = typeof opt === 'string' ? (opt === 'ALL' ? allLabel : opt) : opt.label;
-    return { val, label };
-  });
-  const useSearch = normalized.length > DROPDOWN_SEARCH_THRESHOLD;
-
-  function renderOptions(term) {
-    const t = (term || '').trim().toLowerCase();
-    const filtered = t ? normalized.filter(o => o.label.toLowerCase().includes(t)) : normalized;
-    const listHtml = filtered.length
-      ? filtered.map(o => `<div class="custom-select-option ${o.val === selectedValue ? 'selected' : ''}" data-value="${escapeHtml(o.val)}">${escapeHtml(o.label)}</div>`).join('')
-      : `<div class="custom-select-empty">No matches</div>`;
-    const listEl = menu.querySelector('.custom-select-list');
-    (listEl || menu).innerHTML = listHtml;
-    (listEl || menu).querySelectorAll('.custom-select-option').forEach(opt => {
-      opt.onclick = (e) => { e.stopPropagation(); menu.classList.remove('open'); onSelect(opt.dataset.value); };
-    });
-  }
-
-  if (useSearch) {
-    menu.innerHTML = `<div class="custom-select-search-wrap"><input type="text" class="custom-select-search" placeholder="Search…" /></div><div class="custom-select-list"></div>`;
-    const input = menu.querySelector('.custom-select-search');
-    input.onclick = (e) => e.stopPropagation();
-    input.oninput = (e) => renderOptions(e.target.value);
-    renderOptions('');
-  } else {
-    menu.innerHTML = '';
-    renderOptions('');
-  }
-
-  wrap.onclick = (e) => {
-    e.stopPropagation();
-    document.querySelectorAll('.custom-select-options.open').forEach(m => { m.style.left = ''; m.style.right = ''; if (m !== menu) m.classList.remove('open'); });
-    const opening = !menu.classList.contains('open');
-    menu.classList.toggle('open');
-    if (opening) {
-      // On a narrow screen a right-aligned menu can overflow off the left
-      // edge of the viewport — flip it to left-aligned when that happens,
-      // and nudge it back on screen if it still doesn't fit either way.
-      requestAnimationFrame(() => {
-        const rect = menu.getBoundingClientRect();
-        if (rect.left < 4) {
-          menu.style.right = 'auto';
-          menu.style.left = '0';
-          const rect2 = menu.getBoundingClientRect();
-          if (rect2.right > window.innerWidth - 4) menu.style.left = (window.innerWidth - 4 - rect2.width) + 'px';
-        }
-      });
-      if (useSearch) { const input = menu.querySelector('.custom-select-search'); if (input) { input.value = ''; renderOptions(''); setTimeout(() => input.focus(), 0); } }
-    }
-  };
-}
-
-function populateMonthDropdown() {
-  const keys = [...new Set(allVisitors.map(visitorMonthKey).filter(Boolean))].sort().reverse();
-  const options = ['ALL', ...keys.map(k => ({ value: k, label: formatMonthLabel(k) }))];
-  buildDropdown('month-selected-text', 'month-dropdown-menu', 'month-filter-wrap', options, filterState.month, 'All Time', val => {
-    filterState.month = val;
-    const pool = val === 'ALL' ? allVisitors : allVisitors.filter(v => visitorMonthKey(v) === val);
-    if (filterState.salesPerson !== 'ALL' && !pool.some(v => v.salesPerson === filterState.salesPerson)) filterState.salesPerson = 'ALL';
-    if (filterState.visitor !== 'ALL' && !pool.some(v => v.key === filterState.visitor)) filterState.visitor = 'ALL';
-    renderDashboard();
+    return `<div class="custom-select-option ${val === selectedValue ? 'selected' : ''}" data-value="${escapeHtml(val)}">${escapeHtml(label)}</div>`;
+  }).join('');
+  wrap.onclick = (e) => { e.stopPropagation(); document.querySelectorAll('.custom-select-options.open').forEach(m => { if (m !== menu) m.classList.remove('open'); }); menu.classList.toggle('open'); };
+  menu.querySelectorAll('.custom-select-option').forEach(opt => {
+    opt.onclick = (e) => { e.stopPropagation(); menu.classList.remove('open'); onSelect(opt.dataset.value); };
   });
 }
 
 function populateSalesPersonDropdown() {
-  const names = [...new Set(monthFilteredVisitors.map(v => v.salesPerson))].sort();
+  const names = [...new Set(allVisitors.map(v => v.salesPerson))].sort();
   buildDropdown('sp-selected-text', 'sp-dropdown-menu', 'salesperson-filter-wrap', ['ALL', ...names], filterState.salesPerson, 'All Sales Persons', val => {
     filterState.salesPerson = val;
     if (filterState.visitor !== 'ALL') {
@@ -1535,7 +1607,7 @@ function populateSalesPersonDropdown() {
 }
 
 function populateVisitorDropdown() {
-  const pool = filterState.salesPerson === 'ALL' ? monthFilteredVisitors : monthFilteredVisitors.filter(v => v.salesPerson === filterState.salesPerson);
+  const pool = filterState.salesPerson === 'ALL' ? allVisitors : allVisitors.filter(v => v.salesPerson === filterState.salesPerson);
   const options = ['ALL', ...pool.map(v => ({ value: v.key, label: filterState.salesPerson === 'ALL' ? `${v.id} (${v.salesPerson})` : v.id }))];
   buildDropdown('visitor-selected-text', 'visitor-dropdown-menu', 'visitor-filter-wrap', options, filterState.visitor, 'All Visitors', val => {
     filterState.visitor = val;
@@ -1551,7 +1623,6 @@ function renderDashboard() {
   if (!rawData) return;
   show('dashboard');
   applyFilters();
-  populateMonthDropdown();
   populateSalesPersonDropdown();
   populateVisitorDropdown();
   updateScopeUI();
@@ -1597,7 +1668,7 @@ function wireStaticUI() {
   });
 
   document.getElementById('reset-filters-btn')?.addEventListener('click', () => {
-    filterState.scope = 'global'; filterState.month = 'ALL'; filterState.salesPerson = 'ALL'; filterState.visitor = 'ALL';
+    filterState.scope = 'global'; filterState.salesPerson = 'ALL'; filterState.visitor = 'ALL';
     sortState.features = { key: null, dir: 'asc' };
     sortState.apartments = { key: null, dir: 'asc' };
     sortState.visitors = { key: 'start', dir: 'asc' };
@@ -1684,7 +1755,7 @@ function exportPDF() {
     const visitors = scopedVisitors;
 
     section('Sales Person Analytics');
-    const spStats = computeSalesPersonStats(monthFilteredVisitors);
+    const spStats = computeSalesPersonStats(allVisitors);
     table(['Sales Person', 'Visitors', 'Total Time', 'Avg Duration', 'Screenshots', 'Favorites', 'Apartments Viewed', 'Top Feature'],
       spStats.map(s => [s.name, String(s.visitorCount), s.totalTime.toFixed(1) + 's', s.avgDuration.toFixed(1) + 's', String(s.screenshots), String(s.favorites), String(s.apartmentsViewed), s.mostPopularFeature]));
 
